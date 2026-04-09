@@ -846,7 +846,7 @@
       } else if (c.status === 'done') {
         const libBtn = c.savedToLibrary
           ? `<button class="card-lib-btn saved" disabled>✓ In Library</button>`
-          : `<button class="card-lib-btn" onclick="saveToLibrary(${idx})">💾 Library</button>`;
+          : `<button class="card-lib-btn" onclick="saveToLibrary(${idx})">Library</button>`;
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>${libBtn}
           <span class="card-status done">${esc(c.filename || '')}</span>`;
       } else if (c.status === 'error') {
