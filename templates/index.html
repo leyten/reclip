@@ -601,10 +601,13 @@
       text-overflow: ellipsis;
     }
 
-    /* Page shifts to make room for sidebar on wide screens */
-    .page { padding-left: calc(280px + 24px); }
-
-    /* Mobile: collapse sidebar behind toggle */
+    /* The centered .page is intentionally NOT shifted for the sidebar.
+       The sidebar is position:fixed and overlays the left edge of the
+       viewport. The page stays visually centered at its original
+       620px max-width. On viewports too narrow to fit both the sidebar
+       and the centered card without overlap, the sidebar collapses
+       behind a toggle so the card is never covered.
+       Min clear width: sidebar(280) + card(620) + breathing(40) = 940 */
     .sidebar-toggle {
       display: none;
       position: fixed;
@@ -622,8 +625,7 @@
       color: var(--fg);
     }
     .sidebar-toggle svg { width: 18px; height: 18px; }
-    @media (max-width: 900px) {
-      .page { padding-left: 24px; }
+    @media (max-width: 940px) {
       .sidebar { transform: translateX(-100%); }
       .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,0.15); }
       .sidebar-toggle { display: flex; }
