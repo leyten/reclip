@@ -202,10 +202,18 @@ def get_info():
 
         info = json.loads(result.stdout)
 
+        # Filter to DASH video-only formats (vcodec set, acodec='none').
+        # We deliberately skip HLS combined formats (e.g. 94-15, 301-7 on
+        # YouTube) because those bake in a specific audio language at
+        # extraction time, defeating any download-time language selector.
+        # By picking video-only formats, the audio_selector() language
+        # filter actually works.
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
-            if height and f.get("vcodec", "none") != "none":
+            vcodec = f.get("vcodec", "none")
+            acodec = f.get("acodec", "none")
+            if height and vcodec != "none" and acodec == "none":
                 tbr = f.get("tbr") or 0
                 if height not in best_by_height or tbr > (best_by_height[height].get("tbr") or 0):
                     best_by_height[height] = f
