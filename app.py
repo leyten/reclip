@@ -18,6 +18,34 @@ DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 LIBRARY_DIR = os.path.join(BASE_DIR, "library")
 LIBRARY_INDEX = os.path.join(LIBRARY_DIR, "index.json")
 
+# YouTube needs cookies (datacenter IPs hit the bot wall) plus a JS runtime
+# and the remote EJS challenge solver to defeat YouTube's "n parameter".
+YT_COOKIES = "/etc/reclip/youtube-cookies.txt"
+YT_CACHE = "/tmp/yt-dlp-cache"
+YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "youtube-nocookie.com")
+
+
+def is_youtube(url: str) -> bool:
+    if not url:
+        return False
+    u = url.lower()
+    return any(h in u for h in YOUTUBE_HOSTS)
+
+
+def ytdlp_extra_args(url: str):
+    """Return extra yt-dlp CLI args for sites that need them.
+    Only enables remote-component fetching for YouTube — limits the blast
+    radius of running github-hosted JS to the one extractor that needs it.
+    """
+    args = ["--cache-dir", YT_CACHE]
+    if is_youtube(url) and os.path.exists(YT_COOKIES):
+        args += [
+            "--cookies", YT_COOKIES,
+            "--js-runtimes", "node",
+            "--remote-components", "ejs:github",
+        ]
+    return args
+
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(LIBRARY_DIR, exist_ok=True)
 
@@ -87,7 +115,7 @@ def run_download(job_id, url, format_choice, format_id):
     job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
-    cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
+    cmd = ["yt-dlp", "--no-playlist", "-o", out_template, *ytdlp_extra_args(url)]
 
     if format_choice == "audio":
         cmd += ["-x", "--audio-format", "mp3"]
@@ -153,7 +181,7 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    cmd = ["yt-dlp", "--no-playlist", "-j", *ytdlp_extra_args(url), url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
