@@ -1,17 +1,87 @@
 import os
+import re
 import uuid
 import glob
 import json
-import subprocess
+import time
+import shutil
 import threading
-from flask import Flask, request, jsonify, send_file, render_template
+import subprocess
+import urllib.request
+import urllib.error
+from flask import Flask, request, jsonify, send_file, render_template, abort
 
 app = Flask(__name__)
-DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
+
+BASE_DIR = os.path.dirname(__file__)
+DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+LIBRARY_DIR = os.path.join(BASE_DIR, "library")
+LIBRARY_INDEX = os.path.join(LIBRARY_DIR, "index.json")
+
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(LIBRARY_DIR, exist_ok=True)
 
 jobs = {}
+library_lock = threading.Lock()
 
+
+# ---------- helpers ----------
+
+def sanitize_title(title, max_len=60):
+    if not title:
+        return ""
+    cleaned = re.sub(r'[\\/:*?"<>|]', "", title).strip()
+    return cleaned[:max_len].strip()
+
+
+def load_library():
+    if not os.path.exists(LIBRARY_INDEX):
+        return []
+    try:
+        with open(LIBRARY_INDEX, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def write_library(items):
+    tmp = LIBRARY_INDEX + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2)
+    os.replace(tmp, LIBRARY_INDEX)
+
+
+def fetch_thumbnail(url, dest_path):
+    """Download a thumbnail URL to dest_path. Returns True on success."""
+    if not url:
+        return False
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; ReClip/1.0)"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read(5 * 1024 * 1024)  # 5MB cap
+        with open(dest_path, "wb") as f:
+            f.write(data)
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def ext_to_mimetype(ext):
+    return {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mkv": "video/x-matroska",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".wav": "audio/wav",
+    }.get(ext.lower(), "application/octet-stream")
+
+
+# ---------- yt-dlp download worker ----------
 
 def run_download(job_id, url, format_choice, format_id):
     job = jobs[job_id]
@@ -59,12 +129,8 @@ def run_download(job_id, url, format_choice, format_id):
         job["file"] = chosen
         ext = os.path.splitext(chosen)[1]
         title = job.get("title", "").strip()
-        # Sanitize title for filename
-        if title:
-            safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:20].strip()
-            job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
-        else:
-            job["filename"] = os.path.basename(chosen)
+        safe_title = sanitize_title(title, 20)
+        job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
     except subprocess.TimeoutExpired:
         job["status"] = "error"
         job["error"] = "Download timed out (5 min limit)"
@@ -72,6 +138,8 @@ def run_download(job_id, url, format_choice, format_id):
         job["status"] = "error"
         job["error"] = str(e)
 
+
+# ---------- routes ----------
 
 @app.route("/")
 def index():
@@ -93,7 +161,6 @@ def get_info():
 
         info = json.loads(result.stdout)
 
-        # Build quality options — keep best format per resolution
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
@@ -131,12 +198,23 @@ def start_download():
     format_choice = data.get("format", "video")
     format_id = data.get("format_id")
     title = data.get("title", "")
+    thumbnail = data.get("thumbnail", "")
+    uploader = data.get("uploader", "")
+    duration = data.get("duration")
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
     job_id = uuid.uuid4().hex[:10]
-    jobs[job_id] = {"status": "downloading", "url": url, "title": title}
+    jobs[job_id] = {
+        "status": "downloading",
+        "url": url,
+        "title": title,
+        "thumbnail": thumbnail,
+        "uploader": uploader,
+        "duration": duration,
+        "format_choice": format_choice,
+    }
 
     thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
     thread.daemon = True
@@ -163,6 +241,145 @@ def download_file(job_id):
     if not job or job["status"] != "done":
         return jsonify({"error": "File not ready"}), 404
     return send_file(job["file"], as_attachment=True, download_name=job["filename"])
+
+
+# ---------- library endpoints ----------
+
+@app.route("/api/library/save/<job_id>", methods=["POST"])
+def library_save(job_id):
+    job = jobs.get(job_id)
+    if not job or job.get("status") != "done":
+        return jsonify({"error": "Job not ready"}), 404
+
+    src = job.get("file")
+    if not src or not os.path.exists(src):
+        return jsonify({"error": "Source file missing"}), 404
+
+    ext = os.path.splitext(src)[1]
+    lib_id = uuid.uuid4().hex[:12]
+    dest = os.path.join(LIBRARY_DIR, f"{lib_id}{ext}")
+
+    try:
+        shutil.move(src, dest)
+    except OSError as e:
+        return jsonify({"error": f"Could not move file: {e}"}), 500
+
+    has_thumb = False
+    thumb_url = job.get("thumbnail", "")
+    if thumb_url:
+        thumb_dest = os.path.join(LIBRARY_DIR, f"{lib_id}.jpg")
+        has_thumb = fetch_thumbnail(thumb_url, thumb_dest)
+
+    title = job.get("title", "") or "Untitled"
+    safe_title = sanitize_title(title, 80) or "video"
+    display_filename = f"{safe_title}{ext}"
+
+    entry = {
+        "id": lib_id,
+        "title": title,
+        "filename": display_filename,
+        "url": job.get("url", ""),
+        "format": job.get("format_choice", "video"),
+        "ext": ext.lstrip("."),
+        "saved_at": int(time.time()),
+        "size": os.path.getsize(dest),
+        "uploader": job.get("uploader", ""),
+        "duration": job.get("duration"),
+        "has_thumb": has_thumb,
+    }
+
+    with library_lock:
+        items = load_library()
+        items.append(entry)
+        write_library(items)
+
+    # Clean up the in-memory job — file is gone
+    job["status"] = "saved"
+    job["file"] = None
+
+    return jsonify({"ok": True, "entry": entry})
+
+
+@app.route("/api/library", methods=["GET"])
+def library_list():
+    with library_lock:
+        items = load_library()
+    items_sorted = sorted(items, key=lambda x: x.get("saved_at", 0), reverse=True)
+    total_size = sum(i.get("size", 0) for i in items)
+    return jsonify({"items": items_sorted, "total_size": total_size, "count": len(items)})
+
+
+def _find_library_entry(lib_id):
+    items = load_library()
+    for it in items:
+        if it.get("id") == lib_id:
+            return it
+    return None
+
+
+def _library_file_path(entry):
+    return os.path.join(LIBRARY_DIR, f"{entry['id']}.{entry['ext']}")
+
+
+@app.route("/api/library/<lib_id>/file")
+def library_play(lib_id):
+    """Inline stream for in-browser playback (supports Range requests)."""
+    entry = _find_library_entry(lib_id)
+    if not entry:
+        abort(404)
+    path = _library_file_path(entry)
+    if not os.path.exists(path):
+        abort(404)
+    mimetype = ext_to_mimetype(os.path.splitext(path)[1])
+    return send_file(path, mimetype=mimetype, conditional=True)
+
+
+@app.route("/api/library/<lib_id>/download")
+def library_download(lib_id):
+    """Force-download as attachment."""
+    entry = _find_library_entry(lib_id)
+    if not entry:
+        abort(404)
+    path = _library_file_path(entry)
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=entry.get("filename") or os.path.basename(path))
+
+
+@app.route("/api/library/<lib_id>/thumb")
+def library_thumb(lib_id):
+    entry = _find_library_entry(lib_id)
+    if not entry or not entry.get("has_thumb"):
+        abort(404)
+    path = os.path.join(LIBRARY_DIR, f"{lib_id}.jpg")
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, mimetype="image/jpeg", conditional=True)
+
+
+@app.route("/api/library/<lib_id>", methods=["DELETE"])
+def library_delete(lib_id):
+    with library_lock:
+        items = load_library()
+        entry = next((it for it in items if it.get("id") == lib_id), None)
+        if not entry:
+            return jsonify({"error": "Not found"}), 404
+
+        # Remove file + thumb
+        for p in (
+            _library_file_path(entry),
+            os.path.join(LIBRARY_DIR, f"{lib_id}.jpg"),
+        ):
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+
+        items = [it for it in items if it.get("id") != lib_id]
+        write_library(items)
+
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

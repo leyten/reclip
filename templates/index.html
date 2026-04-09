@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReClip — Free Media Downloader</title>
+  <title>ReClip</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -378,9 +378,281 @@
       .controls { flex-wrap: wrap; }
       .fetch-btn { width: 100%; }
     }
+
+    /* ---------- Library sidebar ---------- */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 280px;
+      background: var(--card);
+      border-right: 1.5px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sidebar-header {
+      padding: 22px 20px 14px;
+      border-bottom: 1.5px solid var(--card-border);
+    }
+    .sidebar-header h2 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.6rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+    }
+    .sidebar-header h2 em { font-style: italic; color: var(--accent); }
+    .sidebar-stats {
+      margin-top: 6px;
+      font-size: 0.66rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px 20px;
+    }
+    .sidebar-list::-webkit-scrollbar { width: 6px; }
+    .sidebar-list::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+    .lib-empty {
+      padding: 30px 16px;
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      line-height: 1.6;
+    }
+    .lib-item {
+      display: flex;
+      gap: 10px;
+      padding: 9px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+    .lib-item:hover { background: var(--bg); }
+    .lib-thumb {
+      width: 70px;
+      min-width: 70px;
+      height: 46px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--card-border);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .lib-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .lib-thumb .lib-thumb-fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+    }
+    .lib-thumb .lib-thumb-fallback svg { width: 18px; height: 18px; opacity: 0.5; }
+    .lib-thumb .lib-format-tag {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 0.55rem;
+      padding: 1px 4px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .lib-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .lib-title {
+      font-size: 0.7rem;
+      line-height: 1.35;
+      color: var(--fg);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .lib-meta {
+      font-size: 0.6rem;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.02em;
+    }
+    .lib-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 5px;
+    }
+    .lib-btn {
+      width: 22px;
+      height: 22px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .lib-btn:hover { background: var(--card-border); color: var(--fg); }
+    .lib-btn.danger:hover { background: rgba(196,61,61,0.12); color: var(--error); }
+    .lib-btn svg { width: 13px; height: 13px; }
+
+    /* Library save button on cards */
+    .card-lib-btn {
+      padding: 6px 12px;
+      border: 1.5px solid var(--card-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--fg);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-left: 6px;
+    }
+    .card-lib-btn:hover { background: var(--card-border); border-color: var(--muted); }
+    .card-lib-btn.saved {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+      cursor: default;
+    }
+    .card-lib-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Player modal */
+    .player-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 18, 14, 0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 30px;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .player-overlay.open { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .player-box {
+      background: #000;
+      border-radius: 12px;
+      max-width: 90vw;
+      max-height: 88vh;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .player-box video, .player-box audio {
+      display: block;
+      max-width: 90vw;
+      max-height: 88vh;
+      border-radius: 12px;
+    }
+    .player-box audio {
+      width: min(540px, 80vw);
+      margin: 60px 30px;
+    }
+    .player-close {
+      position: absolute;
+      top: -42px;
+      right: 0;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 1.8rem;
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.15s;
+    }
+    .player-close:hover { background: rgba(255,255,255,0.15); }
+    .player-title {
+      position: absolute;
+      bottom: -34px;
+      left: 4px;
+      right: 50px;
+      color: #fff;
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Page shifts to make room for sidebar on wide screens */
+    .page { padding-left: calc(280px + 24px); }
+
+    /* Mobile: collapse sidebar behind toggle */
+    .sidebar-toggle {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 40px;
+      height: 40px;
+      background: var(--card);
+      border: 1.5px solid var(--card-border);
+      border-radius: 10px;
+      z-index: 60;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg);
+    }
+    .sidebar-toggle svg { width: 18px; height: 18px; }
+    @media (max-width: 900px) {
+      .page { padding-left: 24px; }
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,0.15); }
+      .sidebar-toggle { display: flex; }
+    }
   </style>
 </head>
 <body>
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle library">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Lib<em>rary</em></h2>
+      <div class="sidebar-stats" id="libStats">0 items</div>
+    </div>
+    <div class="sidebar-list" id="libList">
+      <div class="lib-empty">No saved videos yet.<br>Download something and click<br><strong>save to library</strong>.</div>
+    </div>
+  </aside>
+
+  <div class="player-overlay" id="playerOverlay" onclick="closePlayer(event)">
+    <div class="player-box" id="playerBox" onclick="event.stopPropagation()">
+      <button class="player-close" onclick="closePlayer()" aria-label="Close">&times;</button>
+      <div id="playerMount"></div>
+      <div class="player-title" id="playerTitle"></div>
+    </div>
+  </div>
+
   <div class="page">
     <div class="brand">
       <h1>Re<em>Clip</em></h1>
@@ -570,7 +842,10 @@
       } else if (c.status === 'downloading') {
         actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
       } else if (c.status === 'done') {
-        actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
+        const libBtn = c.savedToLibrary
+          ? `<button class="card-lib-btn saved" disabled>✓ In Library</button>`
+          : `<button class="card-lib-btn" onclick="saveToLibrary(${idx})">💾 Library</button>`;
+        actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>${libBtn}
           <span class="card-status done">${esc(c.filename || '')}</span>`;
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
@@ -618,6 +893,9 @@
             format: currentFormat,
             format_id: c.selectedFormatId,
             title: c.title || '',
+            thumbnail: c.thumbnail || '',
+            uploader: c.uploader || '',
+            duration: c.duration || null,
           }),
         });
         const data = await res.json();
@@ -671,6 +949,134 @@
       a.download = c.filename || '';
       a.click();
     }
+
+    /* ---------- Library ---------- */
+
+    function fmtSize(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let i = 0;
+      let n = bytes;
+      while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+      return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
+    }
+
+    async function loadLibrary() {
+      try {
+        const res = await fetch('/api/library');
+        const data = await res.json();
+        renderSidebar(data);
+      } catch (err) {
+        console.error('library load failed', err);
+      }
+    }
+
+    function renderSidebar(data) {
+      const stats = document.getElementById('libStats');
+      const list = document.getElementById('libList');
+      stats.textContent = `${data.count} item${data.count === 1 ? '' : 's'} · ${fmtSize(data.total_size)}`;
+
+      if (!data.items.length) {
+        list.innerHTML = `<div class="lib-empty">No saved videos yet.<br>Download something and click<br><strong>save to library</strong>.</div>`;
+        return;
+      }
+
+      list.innerHTML = data.items.map(item => {
+        const thumbInner = item.has_thumb
+          ? `<img src="/api/library/${item.id}/thumb" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+             <div class="lib-thumb-fallback" style="display:none;position:absolute;inset:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>`
+          : `<div class="lib-thumb-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>`;
+        const tag = item.format === 'audio' ? 'MP3' : (item.ext || 'MP4').toUpperCase();
+        return `
+          <div class="lib-item">
+            <div class="lib-thumb" onclick="playLibrary('${item.id}', ${JSON.stringify(item.title || '').replace(/"/g, '&quot;')}, '${item.format}')">
+              ${thumbInner}
+              <div class="lib-format-tag">${tag}</div>
+            </div>
+            <div class="lib-body">
+              <div class="lib-title" title="${esc(item.title || '')}">${esc(item.title || 'Untitled')}</div>
+              <div class="lib-meta">${fmtSize(item.size)}</div>
+              <div class="lib-actions">
+                <button class="lib-btn" title="Play" onclick="playLibrary('${item.id}', ${JSON.stringify(item.title || '').replace(/"/g, '&quot;')}, '${item.format}')">
+                  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+                <button class="lib-btn" title="Download" onclick="downloadLibrary('${item.id}')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button class="lib-btn danger" title="Delete" onclick="deleteLibrary('${item.id}', event)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveToLibrary(idx) {
+      const c = cardData[idx];
+      if (!c.jobId || c.savedToLibrary) return;
+      try {
+        const res = await fetch(`/api/library/save/${c.jobId}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+          alert('Save failed: ' + data.error);
+          return;
+        }
+        c.savedToLibrary = true;
+        renderCard(idx);
+        loadLibrary();
+      } catch (err) {
+        alert('Save failed: ' + err.message);
+      }
+    }
+
+    function playLibrary(id, title, format) {
+      const overlay = document.getElementById('playerOverlay');
+      const mount = document.getElementById('playerMount');
+      const titleEl = document.getElementById('playerTitle');
+      const tag = format === 'audio' ? 'audio' : 'video';
+      mount.innerHTML = `<${tag} controls autoplay src="/api/library/${id}/file"></${tag}>`;
+      titleEl.textContent = title || '';
+      overlay.classList.add('open');
+    }
+
+    function closePlayer(e) {
+      if (e && e.target.id !== 'playerOverlay' && e.target.tagName !== 'BUTTON') return;
+      const overlay = document.getElementById('playerOverlay');
+      const mount = document.getElementById('playerMount');
+      overlay.classList.remove('open');
+      mount.innerHTML = '';
+    }
+
+    function downloadLibrary(id) {
+      const a = document.createElement('a');
+      a.href = `/api/library/${id}/download`;
+      a.click();
+    }
+
+    async function deleteLibrary(id, e) {
+      if (e) e.stopPropagation();
+      if (!confirm('Delete this video from the library?')) return;
+      try {
+        const res = await fetch(`/api/library/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) { alert('Delete failed: ' + data.error); return; }
+        loadLibrary();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closePlayer({ target: { id: 'playerOverlay' } });
+    });
+
+    loadLibrary();
 
     async function dlAll() {
       const btn = document.querySelector('.dl-all-btn');
