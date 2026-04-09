@@ -43,8 +43,20 @@ def ytdlp_extra_args(url: str):
             "--cookies", YT_COOKIES,
             "--js-runtimes", "node",
             "--remote-components", "ejs:github",
+            # Ask the YouTube API in English so the API returns English-
+            # first metadata and audio ordering. The cookied burner account's
+            # account language can otherwise leak through (e.g. Spanish).
+            "--extractor-args", "youtube:lang=en",
         ]
     return args
+
+
+def audio_selector(url: str) -> str:
+    """For sites that publish multi-language audio dubs (notably YouTube),
+    prefer English audio when present, fall back to best audio otherwise."""
+    if is_youtube(url):
+        return "bestaudio[language^=en]/bestaudio"
+    return "bestaudio"
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(LIBRARY_DIR, exist_ok=True)
@@ -116,13 +128,14 @@ def run_download(job_id, url, format_choice, format_id):
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
     cmd = ["yt-dlp", "--no-playlist", "-o", out_template, *ytdlp_extra_args(url)]
+    audio_sel = audio_selector(url)
 
     if format_choice == "audio":
-        cmd += ["-x", "--audio-format", "mp3"]
+        cmd += ["-f", audio_sel, "-x", "--audio-format", "mp3"]
     elif format_id:
-        cmd += ["-f", f"{format_id}+bestaudio/best", "--merge-output-format", "mp4"]
+        cmd += ["-f", f"{format_id}+{audio_sel}/best", "--merge-output-format", "mp4"]
     else:
-        cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
+        cmd += ["-f", f"bestvideo+{audio_sel}/best", "--merge-output-format", "mp4"]
 
     cmd.append(url)
 
